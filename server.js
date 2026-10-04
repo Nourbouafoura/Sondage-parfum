@@ -24,13 +24,13 @@ pool.query(`
 
 // ---------- Validation ----------
 const OPT = {
-  q1: ['masculin', 'feminin', 'les-deux', 'ne-sait-pas'],
+  q1: ['masculin', 'feminin', 'les-deux'],
   q2: ['frais', 'boise', 'sucre', 'oriental-oud', 'intense', 'naturel'],
-  q3: ['quotidien', 'etudes-travail', 'sorties', 'rendez-vous', 'occasions', 'polyvalent'],
-  q4: ['odeur', 'tenue', 'prix', 'qualite', 'flacon', 'originalite'],
-  q5: ['10-15', '15-20', '20-25', '25-30', '30+'],
+  q3: ['quotidien', 'etudes-travail', 'occasions', 'polyvalent'],
+  q4: ['odeur', 'tenue', 'prix', 'flacon', 'originalite'],
+  q5: ['20', '25', '30', '30+'],
   q6: ['bleu-de-chanel', 'dior-sauvage', 'azzaro', '1-million', 'oud-oriental', 'floraux', 'sucres-gourmands', 'autre'],
-  q7: ['oui', 'pourquoi-pas', 'non'],
+  q7: ['oui', 'non'],
 };
 const one = (v, k) => (OPT[k].includes(v) ? v : null);
 const many = (v, k, max) => {
@@ -54,12 +54,12 @@ app.post('/api/responses', async (req, res) => {
   if (limited(req.ip)) return res.status(429).json({ error: 'Trop de tentatives, réessaie plus tard.' });
   const b = req.body || {};
   const r = {
-    q1: one(b.q1, 'q1'), q2: one(b.q2, 'q2'), q3: many(b.q3, 'q3', 6), q4: many(b.q4, 'q4', 2),
+    q1: one(b.q1, 'q1'), q2: one(b.q2, 'q2'), q3: many(b.q3, 'q3', 4), q4: many(b.q4, 'q4', 2),
     q5: one(b.q5, 'q5'), q6: many(b.q6, 'q6', 3), q7: one(b.q7, 'q7'),
     q6_autre: txt(b.q6_autre, 100), q8: txt(b.q8, 300), contact: txt(b.contact, 100),
   };
   const required = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7'];
-  if (required.some(k => !r[k]) || !r.q8) return res.status(400).json({ error: 'Réponses incomplètes.' });
+  if (required.some(k => !r[k])) return res.status(400).json({ error: 'Réponses incomplètes.' });
   try {
     await pool.query(
       `INSERT INTO responses (q1,q2,q3,q4,q5,q6,q6_autre,q7,q8,contact) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
@@ -86,11 +86,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 app.get('/admin', auth, async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM responses ORDER BY id DESC LIMIT 500');
-  const tr = rows.map(r => `<tr><td>${r.id}</td><td>${esc(r.created_at.toISOString().slice(0, 16).replace('T', ' '))}</td><td>${esc(r.q1)}</td><td>${esc(r.q2)}</td><td>${esc(r.q3.join(', '))}</td><td>${esc(r.q4.join(', '))}</td><td>${esc(r.q5)}</td><td>${esc(r.q6.join(', '))}${r.q6_autre ? ' (' + esc(r.q6_autre) + ')' : ''}</td><td>${esc(r.q7)}</td><td>${esc(r.q8)}</td><td>${esc(r.contact)}</td></tr>`).join('');
+  const tr = rows.map(r => `<tr><td>${r.id}</td><td>${esc(r.created_at.toISOString().slice(0, 16).replace('T', ' '))}</td><td>${esc(r.q1)}</td><td>${esc(r.q2)}</td><td>${esc(r.q3.join(', '))}</td><td>${esc(r.q4.join(', '))}</td><td>${esc(r.q5)}</td><td>${esc(r.q6.join(', '))}${r.q6_autre ? ' (' + esc(r.q6_autre) + ')' : ''}</td><td>${esc(r.q7)}</td><td>${esc(r.contact)}</td></tr>`).join('');
   res.send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Réponses</title>
 <style>body{font:14px system-ui;margin:20px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 8px;text-align:left;vertical-align:top}th{background:#f3e8ee}.w{overflow-x:auto}</style>
 <h1>${rows.length} réponse(s)</h1><p><a href="/admin/export.csv">Télécharger en CSV</a></p>
-<div class="w"><table><tr><th>#</th><th>Date</th><th>Type</th><th>Ambiance</th><th>Situations</th><th>Priorités</th><th>Prix 50ml</th><th>Références</th><th>Intéressé</th><th>Odeur idéale</th><th>Contact</th></tr>${tr}</table></div>`);
+<div class="w"><table><tr><th>#</th><th>Date</th><th>Type</th><th>Ambiance</th><th>Situations</th><th>Priorités</th><th>Prix 50ml</th><th>Références</th><th>Intéressé</th><th>Contact</th></tr>${tr}</table></div>`);
 });
 
 app.get('/admin/export.csv', auth, async (req, res) => {
